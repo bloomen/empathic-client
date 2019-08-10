@@ -19,9 +19,13 @@ class Board extends React.Component {
     this.ncol = 10;
     this.session = 42;
     this.state = {
-      heatmap: Array(this.nrow * this.ncol).fill(0),
+      heatmap: this.createHeatmap(),
     };
     this.updateHeatmap();
+  }
+
+  createHeatmap() {
+    return Array(this.nrow * this.ncol).fill(0);
   }
 
   updateHeatmap() {
@@ -34,7 +38,7 @@ class Board extends React.Component {
     })    
     .then((response) => response.json())
     .then((responseJson) => {
-      const heatmap = this.state.heatmap.slice();
+      const heatmap = this.createHeatmap();
       const nrow = this.nrow;
       const ncol = this.ncol;
       responseJson.forEach(function(element) {
@@ -67,9 +71,10 @@ class Board extends React.Component {
       }),
     })
     .then((response) => {
-      if (response.status === 200) {
-        this.updateHeatmap();
+      if (response.status !== 200) {
+        return;
       }
+      this.updateHeatmap();
     })
     .catch((error) => {
       console.error(error);
@@ -98,11 +103,11 @@ class Board extends React.Component {
     const cols = []
     for (let i=0; i<this.ncol; i++) {
       cols.push(this.renderSquare(irow, i));
-    }    
+    }
     return (
       <div className="board-row" key={irow}>
       {cols}
-      </div>      
+      </div>
     );
   }
 
