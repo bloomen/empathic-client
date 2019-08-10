@@ -4,7 +4,7 @@ import './index.css';
 
 function Square(props) {
   return (
-    <button className="square" onClick={props.onClick}>
+    <button className="square" onMouseDown={props.onPress} onMouseUp={props.onRelease}>
     {props.value}
     </button>
   );
@@ -58,7 +58,7 @@ class Board extends React.Component {
     });
   }
 
-  handleClick(i, j) {
+  handlePress(i, j) {
     fetch(this.api + '/press', {
       method: 'POST',
       headers: {
@@ -68,6 +68,27 @@ class Board extends React.Component {
         s: this.session,
         x: j / this.ncol,
         y: i / this.nrow,
+      }),
+    })
+    .then((response) => {
+      if (response.status !== 200) {
+        return;
+      }
+      this.updateHeatmap();
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+  }
+
+  handleRelease() {
+    fetch(this.api + '/release', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: serialize({
+        s: this.session,
       }),
     })
     .then((response) => {
@@ -93,7 +114,8 @@ class Board extends React.Component {
     return (
       <Square
         value={circle}
-        onClick={() => this.handleClick(i, j)}
+        onPress={() => this.handlePress(i, j)}
+        onRelease={() => this.handleRelease()}
         key={index}
       />
     );
