@@ -4,13 +4,15 @@ import './index.css';
 
 function Square(props) {
   return (
-    <button className="square" onMouseDown={props.onPress} onMouseUp={props.onRelease}>
+    <div className="square" onMouseDown={props.onPress} onMouseUp={props.onRelease} onMouseMove={props.onMove}
+     style={{position: "fixed", left: 0, top: 0, width: props.width, height: props.height}}
+    >
     {props.value}
-    </button>
+    </div>
   );
 }
 
-class Board extends React.Component {
+class Empathic extends React.Component {
   constructor(props) {
     super(props);
     this.api = 'http://192.168.1.7/api'
@@ -19,12 +21,30 @@ class Board extends React.Component {
     this.ncol = 10;
     this.session = 42;
     this.state = {
-      heatmap: this.createHeatmap(),
+      width: 0,
+      height: 0,
+      heatmap: this.newHeatmap(),
+      pressing: false,
+      pressX: 0,
+      pressY: 0,
     };
     this.updateHeatmap();
   }
 
-  createHeatmap() {
+  componentDidMount() {
+    this.updateWindowDimensions();
+    window.addEventListener('resize', this.updateWindowDimensions.bind(this));
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.updateWindowDimensions.bind(this));
+  }
+
+  updateWindowDimensions() {
+    this.setState({ width: window.innerWidth, height: window.innerHeight });
+  }
+
+  newHeatmap() {
     return Array(this.nrow * this.ncol).fill(0);
   }
 
@@ -38,7 +58,7 @@ class Board extends React.Component {
     })    
     .then((response) => response.json())
     .then((responseJson) => {
-      const heatmap = this.createHeatmap();
+      const heatmap = this.newHeatmap();
       const nrow = this.nrow;
       const ncol = this.ncol;
       responseJson.forEach(function(element) {
@@ -58,7 +78,8 @@ class Board extends React.Component {
     });
   }
 
-  handlePress(i, j) {
+  handlePress(e) {
+    this.setState({pressX: e.clientX, pressY: e.clientY, pressing: true});
     fetch(this.api + '/press', {
       method: 'POST',
       headers: {
@@ -66,8 +87,8 @@ class Board extends React.Component {
       },
       body: serialize({
         s: this.session,
-        x: j / this.ncol,
-        y: i / this.nrow,
+        x: this.state.pressX / this.state.width,
+        y: this.state.pressY / this.state.height,
       }),
     })
     .then((response) => {
@@ -82,6 +103,7 @@ class Board extends React.Component {
   }
 
   handleRelease() {
+    this.setState({pressX: 0, pressY: 0, pressing: false});
     fetch(this.api + '/release', {
       method: 'POST',
       headers: {
@@ -102,58 +124,39 @@ class Board extends React.Component {
     });
   }
 
-  renderSquare(i, j) {
+  handleMove(e) {
+    this.setState({pressX: e.clientX, pressY: e.clientY});
+  }
+
+  renderCircle() {
+    let i = Math.round(this.state.pressX / this.state.width * this.ncol);
+    let j = Math.round(this.state.pressY / this.state.height * this.nrow);
     let index = i * this.ncol + j;
     let alpha = this.state.heatmap[index];
+//    alpha = 0.7;
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
-    let circle = (
+    let left = (this.state.pressX - 20) + "px";
+    let top = (this.state.pressY - 20) + "px";
+    console.log(color, left, top);
+    return (
       <div>
-      <span className="dot" style={{backgroundColor: color}}></span>
+      <span className="dot" style={{position: "fixed", backgroundColor: color, left: left, top: top}}></span>
       </div>
-    )
+    );
+  }
+
+  render() {
+    let circle = this.state.pressing ? this.renderCircle() : null;
     return (
       <Square
         value={circle}
-        onPress={() => this.handlePress(i, j)}
-        onRelease={() => this.handleRelease()}
-        key={index}
+        onPress={this.handlePress.bind(this)}
+        onRelease={this.handleRelease.bind(this)}
+        onMove={this.handleMove.bind(this)}
+        width={this.state.width}
+        height={this.state.height}
+        key="Square"
       />
-    );
-  }
-
-  renderRow(irow) {
-    const cols = []
-    for (let i=0; i<this.ncol; i++) {
-      cols.push(this.renderSquare(irow, i));
-    }
-    return (
-      <div className="board-row" key={irow}>
-      {cols}
-      </div>
-    );
-  }
-
-  render() {
-    const rows = []
-    for (let i=0; i<this.nrow; i++) {
-      rows.push(this.renderRow(i));
-    }
-    return (
-      <div>
-      {rows}
-      </div>
-    );
-  }
-}
-
-class Game extends React.Component {
-  render() {
-    return (
-      <div className="game">
-        <div className="game-board">
-          <Board />
-        </div>
-      </div>
     );
   }
 }
@@ -161,7 +164,7 @@ class Game extends React.Component {
 // ========================================
 
 ReactDOM.render(
-  <Game />,
+  <Empathic />,
   document.getElementById('root')
 );
 
