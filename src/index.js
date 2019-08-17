@@ -4,8 +4,14 @@ import './index.css';
 
 function Square(props) {
   return (
-    <div className="square" onMouseDown={props.onPress} onMouseUp={props.onRelease} onMouseMove={props.onMove}
-     style={{position: "fixed", left: 0, top: 0, width: props.width, height: props.height}}
+    <div className="square" 
+      onMouseDown={props.onPress} 
+      onMouseUp={props.onRelease} 
+      onMouseMove={props.onMove}
+      onTouchStart={props.onTouchStart}
+      onTouchEnd={props.onTouchEnd}
+      onTouchMove={props.onTouchMove}
+      style={{position: "fixed", left: 0, top: 0, width: props.width, height: props.height}}
     >
     {props.value}
     </div>
@@ -79,6 +85,7 @@ class Empathic extends React.Component {
   }
 
   handlePress(e) {
+    console.log("handlePress");
     this.setState({pressX: e.clientX, pressY: e.clientY, pressing: true});
     fetch(this.api + '/press', {
       method: 'POST',
@@ -103,6 +110,7 @@ class Empathic extends React.Component {
   }
 
   handleRelease() {
+    console.log("handleRelease");
     this.setState({pressX: 0, pressY: 0, pressing: false});
     fetch(this.api + '/release', {
       method: 'POST',
@@ -125,7 +133,26 @@ class Empathic extends React.Component {
   }
 
   handleMove(e) {
+    if (!this.state.pressing) {
+      return;
+    }
+    console.log("handleMove");
     this.setState({pressX: e.clientX, pressY: e.clientY});
+  }
+
+  handleTouchStart(e) {
+    console.log("handleTouchStart");
+    this.handlePress(e.touches[0]);
+  }
+
+  handleTouchEnd() {
+    console.log("handleTouchEnd");
+    this.handleRelease();
+  }
+
+  handleTouchMove(e) {
+    console.log("handleTouchMove");
+    this.handleMove(e.touches[0]);
   }
 
   renderCircle() {
@@ -133,10 +160,10 @@ class Empathic extends React.Component {
     let j = Math.round(this.state.pressY / this.state.height * this.nrow);
     let index = i * this.ncol + j;
     let alpha = this.state.heatmap[index];
-//    alpha = 0.7;
+    //let alpha = 0.7;
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
-    let left = (this.state.pressX - 20) + "px";
-    let top = (this.state.pressY - 20) + "px";
+    let left = (this.state.pressX - 30) + "px";
+    let top = (this.state.pressY - 30) + "px";
     console.log(color, left, top);
     return (
       <div>
@@ -153,6 +180,9 @@ class Empathic extends React.Component {
         onPress={this.handlePress.bind(this)}
         onRelease={this.handleRelease.bind(this)}
         onMove={this.handleMove.bind(this)}
+        onTouchStart={this.handleTouchStart.bind(this)}
+        onTouchEnd={this.handleTouchEnd.bind(this)}
+        onTouchMove={this.handleTouchMove.bind(this)}
         width={this.state.width}
         height={this.state.height}
         key="Square"
@@ -170,7 +200,8 @@ ReactDOM.render(
 
 function serialize(obj) {
   var str = [];
-  for(var p in obj)
-     str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+  for (var p in obj) {
+    str.push(encodeURIComponent(p) + "=" + encodeURIComponent(obj[p]));
+  }
   return str.join("&");
 }
