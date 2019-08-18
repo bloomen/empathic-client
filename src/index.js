@@ -23,6 +23,7 @@ class Empathic extends React.Component {
 //    this.api = 'http://192.168.1.7/api'
     this.api = 'http://127.0.0.1:5000/api'
     this.size = 96;
+    this.session = uuid.v4();
     this.state = {
       width: 0,
       height: 0,
@@ -34,16 +35,11 @@ class Empathic extends React.Component {
   }
 
   componentDidMount() {
-    this.session = uuid.v4();
     this.updateWindowDimensions();
     window.addEventListener('resize', this.updateWindowDimensions.bind(this));
-    this.updateHeatmap();
-  //  this.timer = setInterval(() => this.updateHeatmap(), 10000);
   }
 
   componentWillUnmount() {
-    clearInterval(this.timer);
-    this.timer = null;
     window.removeEventListener('resize', this.updateWindowDimensions.bind(this));
   }
 
@@ -55,16 +51,11 @@ class Empathic extends React.Component {
     return Array(this.size * this.size).fill(0);
   }
 
-  updateHeatmap() {
-    fetch(this.api + '/heat', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    })
-    .then((response) => response.json())
-    .then((responseJson) => {
+  updateHeatmap(response) {
+    if (response.status !== 200) {
+      return;
+    }
+    response.json().then((responseJson) => {
       const heatmap = this.newHeatmap();
       responseJson.forEach(function(element) {
         let res = element.split(",");
@@ -77,9 +68,19 @@ class Empathic extends React.Component {
       }.bind(this));
       this.setState({heatmap: heatmap});
     })
-    .catch((error) => {
-      console.error(error);
-    });
+    .catch(console.error);
+  }
+
+  fetchHeatmap() {
+    fetch(this.api + '/heat', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+    .then(this.updateHeatmap.bind(this))
+    .catch(console.error);
   }
 
   index(ix, iy) {
@@ -101,15 +102,8 @@ class Empathic extends React.Component {
           y: this.state.pressY / this.state.height,
         }),
       })
-      .then((response) => {
-        if (response.status !== 200) {
-          return;
-        }
-        this.updateHeatmap();
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+      .then(this.updateHeatmap.bind(this))
+      .catch(console.error);
     });
   }
 
@@ -125,15 +119,8 @@ class Empathic extends React.Component {
           s: this.session,
         }),
       })
-      .then((response) => {
-        if (response.status !== 200) {
-          return;
-        }
-        this.updateHeatmap();
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+      .then(this.updateHeatmap.bind(this))
+      .catch(console.error);
     });
   }
 
