@@ -20,23 +20,21 @@ function Square(props) {
 class Empathic extends React.Component {
   constructor(props) {
     super(props);
-    this.api = 'http://192.168.1.7/api'
-//    this.api = 'http://127.0.0.1:5000/api'
+//    this.api = 'http://192.168.1.7/api'
+    this.api = 'http://127.0.0.1:5000/api'
     this.size = 96;
-    this.session = uuid.v4();
     this.state = {
       width: 0,
       height: 0,
       heatmap: this.newHeatmap(),
-      pressing: false,
-      pressX: 0,
-      pressY: 0,
+      press: {},
     };
+    document.title = "Empathic";
+    window.oncontextmenu = () => { return false; }
   }
 
   componentDidMount() {
-    document.title = "Empathic " + window.devicePixelRatio;
-    window.oncontextmenu = () => { return false; }
+    this.session = uuid.v4();
     this.updateWindowDimensions();
     window.addEventListener('resize', this.updateWindowDimensions.bind(this));
   }
@@ -49,6 +47,10 @@ class Empathic extends React.Component {
     this.setState({width: window.innerWidth, height: window.innerHeight});
   }
 
+  makeSession(id) {
+    return this.session + "-" + id;
+  }
+
   newHeatmap() {
     return Array(this.size * this.size).fill(0);
   }
@@ -57,19 +59,19 @@ class Empathic extends React.Component {
     if (response.status !== 200) {
       return;
     }
-    response.json().then((responseJson) => {
+    response.json().then(function(responseJson) {
       const heatmap = this.newHeatmap();
-      responseJson.forEach(function(element) {
-        let res = element.split(",");
+      for (const elem of responseJson) {
+        let res = elem.split(",");
         let x = parseFloat(res[0]);
         let y = parseFloat(res[1]);
         let w = parseFloat(res[2]);
         let ix = Math.round(x * this.size);
         let iy = Math.round(y * this.size);
         heatmap[this.index(ix, iy)] = w;
-      }.bind(this));
+      }
       this.setState({heatmap: heatmap});
-    })
+    }.bind(this))
     .catch(console.error);
   }
 
@@ -89,19 +91,26 @@ class Empathic extends React.Component {
     return iy * this.size + ix;
   }
 
-  handlePress(e) {
+  handlePress(id, e) {
+    if (id in this.state.press) {
+      return;
+    }
     persist(e);
-    console.log("handlePress x =", e.clientX, " y =", e.clientY);
-    this.setState({pressX: e.clientX, pressY: e.clientY, pressing: true}, () => {
+    console.log("handlePress id =", id, "x =", e.clientX, " y =", e.clientY);
+
+    const press = copyObj(this.state.press);
+    press[id] = {x: e.clientX, y: e.clientY};
+
+    this.setState({press: press}, () => {
       fetch(this.api + '/press', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: serialize({
-          s: this.session,
-          x: this.state.pressX / this.state.width,
-          y: this.state.pressY / this.state.height,
+          s: this.makeSession(id),
+          x: this.state.press[id].x / this.state.width,
+          y: this.state.press[id].y / this.state.height,
         }),
       })
       .then(this.updateHeatmap.bind(this))
@@ -109,16 +118,23 @@ class Empathic extends React.Component {
     });
   }
 
-  handleRelease() {
-    console.log("handleRelease");
-    this.setState({pressX: 0, pressY: 0, pressing: false}, () => {
+  handleRelease(id) {
+    if (!(id in this.state.press)) {
+      return;
+    }
+    console.log("handleRelease id =", id);
+
+    const press = copyObj(this.state.press);
+    delete press[id];
+
+    this.setState({press: press}, () => {
       fetch(this.api + '/release', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: serialize({
-          s: this.session,
+          s: this.makeSession(id),
         }),
       })
       .then(this.updateHeatmap.bind(this))
@@ -129,17 +145,24 @@ class Empathic extends React.Component {
   handleTouchStart(e) {
     persist(e);
     console.log("handleTouchStart");
-    this.handlePress(e.touches[0]);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const elem = e.changedTouches[i];
+      this.handlePress(elem.identifier, elem);
+    }
   }
 
-  handleTouchEnd() {
+  handleTouchEnd(e) {
+    persist(e);
     console.log("handleTouchEnd");
-    this.handleRelease();
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const elem = e.changedTouches[i];
+      this.handleRelease(elem.identifier);
+    }
   }
 
-  renderCircle() {
-    let ix = Math.round(this.state.pressX / this.state.width * this.size);
-    let iy = Math.round(this.state.pressY / this.state.height * this.size);
+  renderCircle(id) {
+    let ix = Math.round(this.state.press[id].x / this.state.width * this.size);
+    let iy = Math.round(this.state.press[id].y / this.state.height * this.size);
     let alpha = this.state.heatmap[this.index(ix, iy)];
     if (alpha < 0.1) {
       alpha = 0.1;
@@ -147,12 +170,13 @@ class Empathic extends React.Component {
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
     let width = 70;
     let height = width;
-    let left = (this.state.pressX - width);
-    let top = (this.state.pressY - width);
+    let left = this.state.press[id].x - width;
+    let top = this.state.press[id].y - width;
     console.log("renderCircle:", color, left, top);
     return (
-      <div>
-      <span className="dot" style={{
+      <div key={id}>
+      <span className="dot"
+      style={{
         position: "fixed",
         backgroundColor: color,
         width: width + "pt",
@@ -165,12 +189,15 @@ class Empathic extends React.Component {
   }
 
   render() {
-    let circle = this.state.pressing ? this.renderCircle() : null;
+    let circles = []
+    for (const id of Object.keys(this.state.press)) {
+      circles.push(this.renderCircle(id));
+    }
     return (
       <Square
-        value={circle}
-        onPress={this.handlePress.bind(this)}
-        onRelease={this.handleRelease.bind(this)}
+        value={circles}
+        onPress={function(e) { this.handlePress(-1, e); }.bind(this)}
+        onRelease={function(e) { this.handleRelease(-1, e); }.bind(this)}
         onTouchStart={this.handleTouchStart.bind(this)}
         onTouchEnd={this.handleTouchEnd.bind(this)}
         width={this.state.width}
@@ -200,4 +227,8 @@ function persist(e) {
   if (typeof e.persist === 'function') {
     e.persist();
   }
+}
+
+function copyObj(obj) {
+  return JSON.parse(JSON.stringify(obj));
 }
