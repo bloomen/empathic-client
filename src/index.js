@@ -35,6 +35,8 @@ class Empathic extends React.Component {
   }
 
   componentDidMount() {
+    document.title = "Empathic " + window.devicePixelRatio;
+    window.oncontextmenu = () => { return false; }
     this.updateWindowDimensions();
     window.addEventListener('resize', this.updateWindowDimensions.bind(this));
   }
@@ -143,12 +145,21 @@ class Empathic extends React.Component {
       alpha = 0.1;
     }
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
-    let left = (this.state.pressX - 30) + "px";
-    let top = (this.state.pressY - 30) + "px";
+    let width = 70;
+    let height = width;
+    let left = (this.state.pressX - width);
+    let top = (this.state.pressY - width);
     console.log("renderCircle:", color, left, top);
     return (
       <div>
-      <span className="dot" style={{position: "fixed", backgroundColor: color, left: left, top: top}}></span>
+      <span className="dot" style={{
+        position: "fixed",
+        backgroundColor: color,
+        width: width + "pt",
+        height: height + "pt",
+        left: left + "px",
+        top: top + "px"
+      }}></span>
       </div>
     );
   }
