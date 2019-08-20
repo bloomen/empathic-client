@@ -24,7 +24,7 @@ class Empathic extends React.Component {
     super(props);
     this.api = 'http://192.168.1.7/api'
 //    this.api = 'http://127.0.0.1:5000/api'
-    this.size = 96;
+    this.size = 32;
     this.state = {
       width: 0,
       height: 0,
