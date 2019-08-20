@@ -30,6 +30,7 @@ class Empathic extends React.Component {
       height: 0,
       heatmap: this.newHeatmap(),
       press: {},
+      previousMove: {}
     };
     document.title = "Empathic";
     window.oncontextmenu = () => { return false; }
@@ -93,6 +94,12 @@ class Empathic extends React.Component {
     return iy * this.size + ix;
   }
 
+  indexFromPixel(x, y) {
+    let ix = Math.round(x / this.state.width * this.size);
+    let iy = Math.round(y / this.state.height * this.size);
+    return this.index(ix, iy);
+  }
+
   handlePress(id, e) {
     if (id in this.state.press) {
       return;
@@ -128,7 +135,23 @@ class Empathic extends React.Component {
 
     const press = copyObj(this.state.press);
     press[id] = {x: e.clientX, y: e.clientY};
-    this.setState({press: press});
+
+    let heatmap = this.state.heatmap.slice();
+
+    if (id in this.state.previousMove) {
+      const index = this.indexFromPixel(this.state.previousMove[id].x, this.state.previousMove[id].y);
+      heatmap[index] -= 0.1;
+    }
+
+    const index = this.indexFromPixel(press[id].x, press[id].y);
+    let value = heatmap[index];
+    value += 0.1;
+    heatmap[index] = clamp(value, 0, 1);
+
+    const previousMove = copyObj(this.state.previousMove);
+    previousMove[id] = {x: press[id].x, y: press[id].y};
+
+    this.setState({press: press, previousMove: previousMove, heatmap: heatmap});
   }
 
   handleRelease(id) {
@@ -140,7 +163,10 @@ class Empathic extends React.Component {
     const press = copyObj(this.state.press);
     delete press[id];
 
-    this.setState({press: press}, () => {
+    const previousMove = copyObj(this.state.previousMove);
+    delete previousMove[id];
+
+    this.setState({press: press, previousMove: previousMove}, () => {
       fetch(this.api + '/release', {
         method: 'POST',
         headers: {
@@ -182,17 +208,13 @@ class Empathic extends React.Component {
   }
 
   renderCircle(id) {
-    let ix = Math.round(this.state.press[id].x / this.state.width * this.size);
-    let iy = Math.round(this.state.press[id].y / this.state.height * this.size);
-    let alpha = this.state.heatmap[this.index(ix, iy)];
-    if (alpha < 0.1) {
-      alpha = 0.1;
-    }
-    let color = 'rgba(255, 0, 0, ' + alpha + ')';
-    let width = 70;
-    let height = width;
-    let left = this.state.press[id].x - width / 1.4;
-    let top = this.state.press[id].y - width;
+    const index = this.indexFromPixel(this.state.press[id].x, this.state.press[id].y);
+    const alpha = clamp(this.state.heatmap[index], 0, 1);
+    const color = 'rgba(255, 0, 0, ' + alpha + ')';
+    const width = 70;
+    const height = width;
+    const left = this.state.press[id].x - width / 1.4;
+    const top = this.state.press[id].y - width;
     return (
       <div key={id}>
       <span className="dot"
@@ -253,4 +275,8 @@ function persist(e) {
 
 function copyObj(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
 }
