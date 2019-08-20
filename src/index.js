@@ -6,9 +6,11 @@ import './index.css';
 function Square(props) {
   return (
     <div className="square" 
-      onMouseDown={props.onPress} 
-      onMouseUp={props.onRelease} 
+      onMouseDown={props.onPress}
+      onMouseMove={props.onMove}
+      onMouseUp={props.onRelease}
       onTouchStart={props.onTouchStart}
+      onTouchMove={props.onTouchMove}
       onTouchEnd={props.onTouchEnd}
       style={{position: "fixed", left: 0, top: 0, width: props.width, height: props.height}}
     >
@@ -118,6 +120,17 @@ class Empathic extends React.Component {
     });
   }
 
+  handleMove(id, e) {
+    if (!(id in this.state.press)) {
+      return;
+    }
+    persist(e);
+
+    const press = copyObj(this.state.press);
+    press[id] = {x: e.clientX, y: e.clientY};
+    this.setState({press: press});
+  }
+
   handleRelease(id) {
     if (!(id in this.state.press)) {
       return;
@@ -151,6 +164,14 @@ class Empathic extends React.Component {
     }
   }
 
+  handleTouchMove(e) {
+    persist(e);
+    for (let i = 0; i < e.changedTouches.length; i++) {
+      const elem = e.changedTouches[i];
+      this.handleMove(elem.identifier, elem);
+    }
+  }
+
   handleTouchEnd(e) {
     persist(e);
     console.log("handleTouchEnd");
@@ -164,15 +185,14 @@ class Empathic extends React.Component {
     let ix = Math.round(this.state.press[id].x / this.state.width * this.size);
     let iy = Math.round(this.state.press[id].y / this.state.height * this.size);
     let alpha = this.state.heatmap[this.index(ix, iy)];
-    if (alpha < 0.1) {
-      alpha = 0.1;
+    if (alpha < 0.05) {
+      alpha = 0.05;
     }
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
     let width = 70;
     let height = width;
-    let left = this.state.press[id].x - width;
+    let left = this.state.press[id].x - width / 1.4;
     let top = this.state.press[id].y - width;
-    console.log("renderCircle:", color, left, top);
     return (
       <div key={id}>
       <span className="dot"
@@ -197,8 +217,10 @@ class Empathic extends React.Component {
       <Square
         value={circles}
         onPress={function(e) { this.handlePress(-1, e); }.bind(this)}
+        onMove={function(e) { this.handleMove(-1, e); }.bind(this)}
         onRelease={function(e) { this.handleRelease(-1, e); }.bind(this)}
         onTouchStart={this.handleTouchStart.bind(this)}
+        onTouchMove={this.handleTouchMove.bind(this)}
         onTouchEnd={this.handleTouchEnd.bind(this)}
         width={this.state.width}
         height={this.state.height}
