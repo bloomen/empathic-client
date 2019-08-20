@@ -185,8 +185,8 @@ class Empathic extends React.Component {
     let ix = Math.round(this.state.press[id].x / this.state.width * this.size);
     let iy = Math.round(this.state.press[id].y / this.state.height * this.size);
     let alpha = this.state.heatmap[this.index(ix, iy)];
-    if (alpha < 0.05) {
-      alpha = 0.05;
+    if (alpha < 0.1) {
+      alpha = 0.1;
     }
     let color = 'rgba(255, 0, 0, ' + alpha + ')';
     let width = 70;
