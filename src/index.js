@@ -29,9 +29,11 @@ class Empathic extends React.Component {
     this.state = {
       width: 0,
       height: 0,
+      fetchingHeatmap: false,
       heatmap: this.newHeatmap(),
-      press: {},
-      previousMove: {}
+      sessionLock: [], // ids
+      press: {}, // {id: {x: ?, y: ?}}
+      previousMove: {}, // {id: {x: ?, y: ?}}
     };
     document.title = "Empathic";
     window.oncontextmenu = () => { return false; }
@@ -82,15 +84,47 @@ class Empathic extends React.Component {
   }
 
   fetchHeatmap() {
-    fetch(this.api + '/heat', {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-    })
-    .then(this.updateHeatmap.bind(this))
-    .catch(console.error);
+    if (this.state.fetchingHeatmap) {
+      return;
+    }
+    this.setState({fetchingHeatmap: true}, () => {
+      fetch(this.api + '/heat', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+      .then(function(response) {
+        this.setState({fetchingHeatmap: false}, () => {
+          this.updateHeatmap(response);
+        });
+      }.bind(this))
+      .catch(function(response) {
+        this.setState({fetchingHeatmap: false});
+        console.error(response);
+      }.bind(this))
+    });
+  }
+
+  releaseLock(id) {
+    let sessionLock = this.state.sessionLock.slice();
+    sessionLock = arrayRemove(sessionLock, id);
+    this.setState({sessionLock: sessionLock});
+  }
+
+  // TODO: Fix locking
+  acquireLock(id) {
+    return new Promise(function(resolve, reject) {
+      while (id in this.state.sessionLock) {
+        sleep(10);
+      }
+      let sessionLock = this.state.sessionLock.slice();
+      sessionLock.push(id);
+      this.setState({sessionLock: sessionLock}, () => {
+        resolve(true);
+      });
+    }.bind(this));
   }
 
   index(ix, iy) {
@@ -110,10 +144,13 @@ class Empathic extends React.Component {
     persist(e);
     console.log("handlePress id =", id, "x =", e.clientX, " y =", e.clientY);
 
+    const sessionLock = this.state.sessionLock.slice();
+    sessionLock.push(id);
+
     const press = copyObj(this.state.press);
     press[id] = {x: e.clientX, y: e.clientY};
 
-    this.setState({press: press}, () => {
+    this.setState({sessionLock: sessionLock, press: press}, () => {
       fetch(this.api + '/press', {
         method: 'POST',
         headers: {
@@ -125,8 +162,14 @@ class Empathic extends React.Component {
           y: this.state.press[id].y / this.state.height,
         }),
       })
-      .then(this.updateHeatmap.bind(this))
-      .catch(console.error);
+      .then(function(response) {
+        this.releaseLock(id);
+        this.updateHeatmap(response);
+      }.bind(this))
+      .catch(function(response) {
+        this.releaseLock(id);
+        console.error(response);
+      }.bind(this));
     });
   }
 
@@ -179,8 +222,14 @@ class Empathic extends React.Component {
           s: this.makeSession(id),
         }),
       })
-      .then(this.updateHeatmap.bind(this))
-      .catch(console.error);
+      .then(function(response) {
+        this.releaseLock(id);
+        this.updateHeatmap(response);
+      }.bind(this))
+      .catch(function(response) {
+        this.releaseLock(id);
+        console.error(response);
+      }.bind(this));
     });
   }
 
@@ -301,4 +350,14 @@ function copyObj(obj) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function arrayRemove(arr, value) {
+  return arr.filter(function(elem) {
+    return elem != value;
+  });
+}
+
+function sleep(milliseconds) {
+  return setTimeout(() => {}, milliseconds);
 }
