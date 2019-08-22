@@ -22,8 +22,9 @@ function Square(props) {
 class Empathic extends React.Component {
   constructor(props) {
     super(props);
-    this.api = 'http://192.168.1.7/api'
-//    this.api = 'http://127.0.0.1:5000/api'
+    this.debug = true;
+    this.api = 'http://192.168.1.7/api';
+//    this.api = 'http://127.0.0.1:5000/api';
     this.size = 32;
     this.state = {
       width: 0,
@@ -47,7 +48,9 @@ class Empathic extends React.Component {
   }
 
   updateWindowDimensions() {
-    this.setState({width: window.innerWidth, height: window.innerHeight});
+    this.setState({width: window.innerWidth, height: window.innerHeight}, () => {
+        this.fetchHeatmap();
+    });
   }
 
   makeSession(id) {
@@ -207,14 +210,14 @@ class Empathic extends React.Component {
     }
   }
 
-  renderCircle(id) {
-    const index = this.indexFromPixel(this.state.press[id].x, this.state.press[id].y);
+  renderCircle(id, x, y, size=70) {
+    const index = this.indexFromPixel(x, y);
     const alpha = clamp(this.state.heatmap[index], 0, 1);
     const color = 'rgba(255, 0, 0, ' + alpha + ')';
-    const width = 70;
+    const width = size;
     const height = width;
-    const left = this.state.press[id].x - width / 1.4;
-    const top = this.state.press[id].y - width;
+    const left = x - width / 1.4;
+    const top = y - width;
     return (
       <div key={id}>
       <span className="dot"
@@ -230,10 +233,29 @@ class Empathic extends React.Component {
     );
   }
 
-  render() {
+  initialCircles() {
     let circles = []
+    if (this.debug) {
+      for (let ix = 0; ix < this.size; ix++) {
+        for (let iy = 0; iy < this.size; iy++) {
+          let index = this.index(ix, iy);
+          if (this.state.heatmap[index] > 0) {
+            let x = Math.round(ix / this.size * this.state.width);
+            let y = Math.round(iy / this.size * this.state.height);
+            circles.push(this.renderCircle(1000 + index, x, y, 35));
+          }
+        }
+      }
+    }
+    return circles;
+  }
+
+  render() {
+    let circles = this.initialCircles();
     for (const id of Object.keys(this.state.press)) {
-      circles.push(this.renderCircle(id));
+      let x = this.state.press[id].x;
+      let y = this.state.press[id].y;
+      circles.push(this.renderCircle(id, x, y));
     }
     return (
       <Square
