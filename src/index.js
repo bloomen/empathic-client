@@ -31,7 +31,6 @@ class Empathic extends React.Component {
       height: 0,
       fetchingHeatmap: false,
       heatmap: this.newHeatmap(),
-      sessionLock: [], // ids
       press: {}, // {id: {x: ?, y: ?}}
       previousMove: {}, // {id: {x: ?, y: ?}}
     };
@@ -51,7 +50,7 @@ class Empathic extends React.Component {
 
   updateWindowDimensions() {
     this.setState({width: window.innerWidth, height: window.innerHeight}, () => {
-        this.fetchHeatmap();
+      this.fetchHeatmap();
     });
   }
 
@@ -107,26 +106,6 @@ class Empathic extends React.Component {
     });
   }
 
-  releaseLock(id) {
-    let sessionLock = this.state.sessionLock.slice();
-    sessionLock = arrayRemove(sessionLock, id);
-    this.setState({sessionLock: sessionLock});
-  }
-
-  // TODO: Fix locking
-  acquireLock(id) {
-    return new Promise(function(resolve, reject) {
-      while (id in this.state.sessionLock) {
-        sleep(10);
-      }
-      let sessionLock = this.state.sessionLock.slice();
-      sessionLock.push(id);
-      this.setState({sessionLock: sessionLock}, () => {
-        resolve(true);
-      });
-    }.bind(this));
-  }
-
   index(ix, iy) {
     return iy * this.size + ix;
   }
@@ -144,13 +123,10 @@ class Empathic extends React.Component {
     persist(e);
     console.log("handlePress id =", id, "x =", e.clientX, " y =", e.clientY);
 
-    const sessionLock = this.state.sessionLock.slice();
-    sessionLock.push(id);
-
     const press = copyObj(this.state.press);
     press[id] = {x: e.clientX, y: e.clientY};
 
-    this.setState({sessionLock: sessionLock, press: press}, () => {
+    this.setState({press: press}, () => {
       fetch(this.api + '/press', {
         method: 'POST',
         headers: {
@@ -163,13 +139,11 @@ class Empathic extends React.Component {
         }),
       })
       .then(function(response) {
-        this.releaseLock(id);
         this.updateHeatmap(response);
       }.bind(this))
       .catch(function(response) {
-        this.releaseLock(id);
         console.error(response);
-      }.bind(this));
+      });
     });
   }
 
@@ -223,13 +197,11 @@ class Empathic extends React.Component {
         }),
       })
       .then(function(response) {
-        this.releaseLock(id);
         this.updateHeatmap(response);
       }.bind(this))
       .catch(function(response) {
-        this.releaseLock(id);
         console.error(response);
-      }.bind(this));
+      });
     });
   }
 
@@ -350,14 +322,4 @@ function copyObj(obj) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
-}
-
-function arrayRemove(arr, value) {
-  return arr.filter(function(elem) {
-    return elem != value;
-  });
-}
-
-function sleep(milliseconds) {
-  return setTimeout(() => {}, milliseconds);
 }
