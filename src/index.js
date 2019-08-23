@@ -33,6 +33,8 @@ class Empathic extends React.Component {
       heatmap: this.newHeatmap(),
       press: {}, // {id: {x: ?, y: ?}}
       previousMove: {}, // {id: {x: ?, y: ?}}
+      pressRequests: {}, // {id: req}
+      releaseRequests: {} // {id: req}
     };
     document.title = "Empathic";
     window.oncontextmenu = () => { return false; }
@@ -127,23 +129,39 @@ class Empathic extends React.Component {
     press[id] = {x: e.clientX, y: e.clientY};
 
     this.setState({press: press}, () => {
-      fetch(this.api + '/press', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: serialize({
-          s: this.makeSession(id),
-          x: this.state.press[id].x / this.state.width,
-          y: this.state.press[id].y / this.state.height,
-        }),
-      })
-      .then(function(response) {
-        this.updateHeatmap(response);
-      }.bind(this))
-      .catch(function(response) {
-        console.error(response);
-      });
+      let pressRequest = function() {
+        fetch(this.api + '/press', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: serialize({
+            s: this.makeSession(id),
+            x: this.state.press[id].x / this.state.width,
+            y: this.state.press[id].y / this.state.height,
+          }),
+        })
+        .then(this.updateHeatmap.bind(this))
+        .catch(console.error)
+        .then(function() {
+          console.log("press finally id =", id);
+          const pressRequests = copyObj(this.state.pressRequests);
+          delete pressRequests[id];
+          this.setState({pressRequests: pressRequests}, () => {
+            if (id in this.state.releaseRequests) {
+              this.state.releaseRequests[id]();
+            }
+          });
+        }.bind(this));
+      }.bind(this);
+
+      const pressRequests = copyObj(this.state.pressRequests);
+      pressRequests[id] = pressRequest;
+      this.setState({pressRequests: pressRequests});
+
+      if (!(id in this.state.releaseRequests)) {
+        pressRequest();
+      }
     });
   }
 
@@ -187,21 +205,37 @@ class Empathic extends React.Component {
     delete previousMove[id];
 
     this.setState({press: press, previousMove: previousMove}, () => {
-      fetch(this.api + '/release', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: serialize({
-          s: this.makeSession(id),
-        }),
-      })
-      .then(function(response) {
-        this.updateHeatmap(response);
-      }.bind(this))
-      .catch(function(response) {
-        console.error(response);
-      });
+      let releaseRequest = function() {
+        fetch(this.api + '/release', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: serialize({
+            s: this.makeSession(id),
+          }),
+        })
+        .then(this.updateHeatmap.bind(this))
+        .catch(console.error)
+        .then(function() {
+          console.log("release finally id =", id);
+          const releaseRequests = copyObj(this.state.releaseRequests);
+          delete releaseRequests[id];
+          this.setState({releaseRequests: releaseRequests}, () => {
+            if (id in this.state.pressRequests) {
+              this.state.pressRequests[id]();
+            }
+          });
+        }.bind(this));
+      }.bind(this);
+
+      const releaseRequests = copyObj(this.state.releaseRequests);
+      releaseRequests[id] = releaseRequest;
+      this.setState({releaseRequests: releaseRequests});
+
+      if (!(id in this.state.pressRequests)) {
+        releaseRequest();
+      }
     });
   }
 
@@ -323,3 +357,11 @@ function copyObj(obj) {
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
+
+// function removeFrom(array, value) {
+//   var index = array.indexOf(value);
+//   if (index > -1) {
+//     return array.splice(index, 1);
+//   }
+//   return array;
+// }
