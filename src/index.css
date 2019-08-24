@@ -1,6 +1,11 @@
 body {
   font: 14px "Century Gothic", Futura, sans-serif;
   background: #606;
+  -webkit-overflow-scrolling: touch;
+}
+
+html, body {
+  overflow: hidden;
 }
 
 .dot {

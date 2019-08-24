@@ -130,6 +130,9 @@ class Empathic extends React.Component {
 
     this.setState({press: press}, () => {
       let pressRequest = function() {
+        if (!(id in this.state.press)) {
+          return;
+        }
         console.log("press post id =", id);
         fetch(this.api + '/press', {
           method: 'POST',
