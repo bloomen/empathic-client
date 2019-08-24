@@ -186,9 +186,7 @@ class Empathic extends React.Component {
     }
 
     const index = this.indexFromPixel(press[id].x, press[id].y);
-    let value = heatmap[index];
-    value += 0.1;
-    heatmap[index] = clamp(value, 0, 1);
+    heatmap[index] = clamp(heatmap[index] + 0.1, 0, 1);
 
     const previousMove = copyObj(this.state.previousMove);
     previousMove[id] = {x: press[id].x, y: press[id].y};
