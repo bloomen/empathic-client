@@ -130,6 +130,7 @@ class Empathic extends React.Component {
 
     this.setState({press: press}, () => {
       let pressRequest = function() {
+        console.log("press post id =", id);
         fetch(this.api + '/press', {
           method: 'POST',
           headers: {
@@ -155,7 +156,7 @@ class Empathic extends React.Component {
         }.bind(this));
       }.bind(this);
 
-      const pressRequests = copyObj(this.state.pressRequests);
+      const pressRequests = this.state.pressRequests;
       pressRequests[id] = pressRequest;
       this.setState({pressRequests: pressRequests});
 
@@ -206,6 +207,7 @@ class Empathic extends React.Component {
 
     this.setState({press: press, previousMove: previousMove}, () => {
       let releaseRequest = function() {
+        console.log("release post id =", id);
         fetch(this.api + '/release', {
           method: 'POST',
           headers: {
@@ -229,7 +231,7 @@ class Empathic extends React.Component {
         }.bind(this));
       }.bind(this);
 
-      const releaseRequests = copyObj(this.state.releaseRequests);
+      const releaseRequests = this.state.releaseRequests;
       releaseRequests[id] = releaseRequest;
       this.setState({releaseRequests: releaseRequests});
 
