@@ -22,7 +22,7 @@ function Square(props) {
 class Empathic extends React.Component {
   constructor(props) {
     super(props);
-    this.debug = true;
+    this.debug = false;
     this.api = 'http://192.168.1.7/api';
 //    this.api = 'http://127.0.0.1:5000/api';
     this.size = 32;
@@ -124,7 +124,6 @@ class Empathic extends React.Component {
       }
 
       let pressReq = function() {
-        console.log("2 press post id =", id);
         if (id in this.releaseRequests) {
           return;
         }
@@ -191,7 +190,6 @@ class Empathic extends React.Component {
       }
 
       let releaseReq = function() {
-        console.log("2 release post id =", id);
         if (id in this.pressRequests) {
           return;
         }
