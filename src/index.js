@@ -35,7 +35,6 @@ class Empathic extends React.Component {
       heatmap: this.newHeatmap(),
       press: {}, // {id: {x: ?, y: ?}}
     };
-    document.title = "Empathic";
     window.oncontextmenu = () => { return false; }
   }
 
@@ -174,7 +173,6 @@ class Empathic extends React.Component {
       return;
     }
     persist(e);
-
     this.handlePressImpl(id, e);
   }
 
