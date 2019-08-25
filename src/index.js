@@ -26,15 +26,14 @@ class Empathic extends React.Component {
     this.api = 'http://192.168.1.7/api';
 //    this.api = 'http://127.0.0.1:5000/api';
     this.size = 32;
+    this.pressRequests = {}; // {id: req}
+    this.releaseRequests = {}; // {id: req}
+    this.fetchingHeatmap = false;
     this.state = {
       width: 0,
       height: 0,
-      fetchingHeatmap: false,
       heatmap: this.newHeatmap(),
       press: {}, // {id: {x: ?, y: ?}}
-      previousMove: {}, // {id: {x: ?, y: ?}}
-      pressRequests: {}, // {id: req}
-      releaseRequests: {} // {id: req}
     };
     document.title = "Empathic";
     window.oncontextmenu = () => { return false; }
@@ -85,27 +84,22 @@ class Empathic extends React.Component {
   }
 
   fetchHeatmap() {
-    if (this.state.fetchingHeatmap) {
+    if (this.fetchingHeatmap) {
       return;
     }
-    this.setState({fetchingHeatmap: true}, () => {
-      fetch(this.api + '/heat', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      })
-      .then(function(response) {
-        this.setState({fetchingHeatmap: false}, () => {
-          this.updateHeatmap(response);
-        });
-      }.bind(this))
-      .catch(function(response) {
-        this.setState({fetchingHeatmap: false});
-        console.error(response);
-      }.bind(this))
-    });
+    this.fetchingHeatmap = true;
+    fetch(this.api + '/heat', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    })
+    .then(this.updateHeatmap.bind(this))
+    .catch(console.error)
+    .then(function() {
+      this.fetchingHeatmap = false;
+    }.bind(this));
   }
 
   index(ix, iy) {
@@ -118,19 +112,21 @@ class Empathic extends React.Component {
     return this.index(ix, iy);
   }
 
-  handlePress(id, e) {
-    if (id in this.state.press) {
-      return;
-    }
-    persist(e);
-    console.log("handlePress id =", id, "x =", e.clientX, " y =", e.clientY);
-
+  handlePressImpl(id, e) {
     const press = copyObj(this.state.press);
     press[id] = {x: e.clientX, y: e.clientY};
 
     this.setState({press: press}, () => {
-      let pressRequest = function() {
-        if (!(id in this.state.press)) {
+      if (!(id in this.state.press)) {
+        return;
+      }
+      if (id in this.pressRequests) {
+        return;
+      }
+
+      let pressReq = function() {
+        console.log("2 press post id =", id);
+        if (id in this.releaseRequests) {
           return;
         }
         console.log("press post id =", id);
@@ -149,24 +145,28 @@ class Empathic extends React.Component {
         .catch(console.error)
         .then(function() {
           console.log("press finally id =", id);
-          const pressRequests = copyObj(this.state.pressRequests);
-          delete pressRequests[id];
-          this.setState({pressRequests: pressRequests}, () => {
-            if (id in this.state.releaseRequests) {
-              this.state.releaseRequests[id]();
-            }
-          });
+          delete this.pressRequests[id];
+          if (id in this.releaseRequests) {
+            this.releaseRequests[id]();
+          }
         }.bind(this));
       }.bind(this);
 
-      const pressRequests = this.state.pressRequests;
-      pressRequests[id] = pressRequest;
-      this.setState({pressRequests: pressRequests});
+      this.pressRequests[id] = pressReq;
 
-      if (!(id in this.state.releaseRequests)) {
-        pressRequest();
+      if (!(id in this.releaseRequests)) {
+        pressReq();
       }
     });
+  }
+
+  handlePress(id, e) {
+    if (id in this.state.press) {
+      return;
+    }
+    persist(e);
+    console.log("handlePress id =", id, "x =", e.clientX, " y =", e.clientY);
+    this.handlePressImpl(id, e);
   }
 
   handleMove(id, e) {
@@ -175,23 +175,7 @@ class Empathic extends React.Component {
     }
     persist(e);
 
-    const press = copyObj(this.state.press);
-    press[id] = {x: e.clientX, y: e.clientY};
-
-    let heatmap = this.state.heatmap.slice();
-
-    if (id in this.state.previousMove) {
-      const index = this.indexFromPixel(this.state.previousMove[id].x, this.state.previousMove[id].y);
-      heatmap[index] -= 0.1;
-    }
-
-    const index = this.indexFromPixel(press[id].x, press[id].y);
-    heatmap[index] = clamp(heatmap[index] + 0.1, 0, 1);
-
-    const previousMove = copyObj(this.state.previousMove);
-    previousMove[id] = {x: press[id].x, y: press[id].y};
-
-    this.setState({press: press, previousMove: previousMove, heatmap: heatmap});
+    this.handlePressImpl(id, e);
   }
 
   handleRelease(id) {
@@ -203,11 +187,16 @@ class Empathic extends React.Component {
     const press = copyObj(this.state.press);
     delete press[id];
 
-    const previousMove = copyObj(this.state.previousMove);
-    delete previousMove[id];
+    this.setState({press: press}, () => {
+      if (id in this.releaseRequests) {
+        return;
+      }
 
-    this.setState({press: press, previousMove: previousMove}, () => {
-      let releaseRequest = function() {
+      let releaseReq = function() {
+        console.log("2 release post id =", id);
+        if (id in this.pressRequests) {
+          return;
+        }
         console.log("release post id =", id);
         fetch(this.api + '/release', {
           method: 'POST',
@@ -222,22 +211,17 @@ class Empathic extends React.Component {
         .catch(console.error)
         .then(function() {
           console.log("release finally id =", id);
-          const releaseRequests = copyObj(this.state.releaseRequests);
-          delete releaseRequests[id];
-          this.setState({releaseRequests: releaseRequests}, () => {
-            if (id in this.state.pressRequests) {
-              this.state.pressRequests[id]();
-            }
-          });
+          delete this.releaseRequests[id];
+          if (id in this.pressRequests) {
+            this.pressRequests[id]();
+          }
         }.bind(this));
       }.bind(this);
 
-      const releaseRequests = this.state.releaseRequests;
-      releaseRequests[id] = releaseRequest;
-      this.setState({releaseRequests: releaseRequests});
+      this.releaseRequests[id] = releaseReq;
 
-      if (!(id in this.state.pressRequests)) {
-        releaseRequest();
+      if (!(id in this.pressRequests)) {
+        releaseReq();
       }
     });
   }
@@ -268,10 +252,8 @@ class Empathic extends React.Component {
     }
   }
 
-  renderCircle(id, x, y, size=70) {
-    const index = this.indexFromPixel(x, y);
-    const alpha = clamp(this.state.heatmap[index], 0, 1);
-    const color = 'rgba(255, 0, 0, ' + alpha + ')';
+  renderCircle(id, x, y, w, size=70) {
+    const color = 'rgba(255, 0, 0, ' + w + ')';
     const width = size;
     const height = width;
     const left = x - width / 1.4;
@@ -300,7 +282,8 @@ class Empathic extends React.Component {
           if (this.state.heatmap[index] > 0) {
             let x = Math.round(ix / this.size * this.state.width);
             let y = Math.round(iy / this.size * this.state.height);
-            circles.push(this.renderCircle(1000 + index, x, y, 35));
+            let w = clamp(this.state.heatmap[this.indexFromPixel(x, y)], 0, 1);
+            circles.push(this.renderCircle(1000 + index, x, y, w, 35));
           }
         }
       }
@@ -313,7 +296,8 @@ class Empathic extends React.Component {
     for (const id of Object.keys(this.state.press)) {
       let x = this.state.press[id].x;
       let y = this.state.press[id].y;
-      circles.push(this.renderCircle(id, x, y));
+      let w = clamp(this.state.heatmap[this.indexFromPixel(x, y)], 0.1, 1);
+      circles.push(this.renderCircle(id, x, y, w));
     }
     return (
       <Square
